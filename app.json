@@ -42,7 +42,7 @@
     },
     "LOG_CHANNEL": {
       "description": "Numeric Telegram log channel ID",
-      "required": true
+      "required": false
     },
     "UPDATE_CHANNEL": {
       "description": "Update channel username with @",
@@ -65,6 +65,10 @@
       "description": "Engine depth: 2, 3 or 4",
       "value": "3",
       "required": false
+    },
+    "WEBAPP_URL": {
+      "description": "Full https URL of the webapp, e.g. https://your-app-xxxx.herokuapp.com/webapp/ (copy from Heroku \u2192 Settings \u2192 Domains)",
+      "required": false
     }
   },
   "formation": {
@@ -78,5 +82,5 @@
       "url": "heroku/python"
     }
   ],
-  "stack": "heroku-26"
+  "stack": "heroku-24"
 }

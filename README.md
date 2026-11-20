@@ -41,7 +41,11 @@ Opens the chess webapp inside Telegram and plays **every move automatically** us
 | `LOG_CHANNEL` | numeric chat ID of your log chat (add the bot as admin) |
 | `HEROKU_APP_NAME` | your Heroku app name (e.g. `chesa-auto`) |
 
-Optional: `UPDATE_CHANNEL`, `UPDATE_CHANNEL_LINK`, `MONGO_DB`, `AUTOPLAY_DEPTH`.
+Optional: `LOG_CHANNEL`, `WEBAPP_URL`, `UPDATE_CHANNEL`, `UPDATE_CHANNEL_LINK`, `MONGO_DB`, `AUTOPLAY_DEPTH`.
+
+> **WEBAPP_URL** — new Heroku apps get a random domain suffix (e.g. `chesa-auto-1a2b3c4d5e6f.herokuapp.com`). Copy the real domain from Heroku → Settings → Domains and set `WEBAPP_URL=https://<domain>/webapp/`. Telegram only accepts **https** webapp links.
+
+> **MongoDB Atlas** — allow `0.0.0.0/0` in Network Access, otherwise Heroku can't connect.
 
 ## 🛠️ Run locally
 
@@ -55,6 +59,16 @@ python -m chesa_auto.main
 
 The webapp is served at `http://localhost:8080/webapp/`.
 
+## 🔐 User session
+
+`/login` (owner, private chat) signs in your user account. The session is stored in MongoDB, so it survives Heroku dyno restarts and is restored automatically on boot. `/logout` revokes and deletes it.
+
+## 📦 Stack
+
+- Python 3.12
+- [Kurigram](https://pypi.org/project/kurigram/) 2.2 — maintained drop-in fork of Pyrogram (imports stay `from pyrogram import …`)
+- PyMongo 4.20 native async client (Motor removed — it was deprecated and caused the `_QUERY_OPTIONS` import crash)
+
 ## 📁 Project structure
 
 ```
@@ -64,7 +78,7 @@ Chesa_Auto/
 │   ├── main.py          # entry point: HTTP server + bot
 │   ├── bot.py           # pyrogram Telegram bot
 │   ├── config.py        # env-var config
-│   ├── database.py      # MongoDB (motor) layer
+│   ├── database.py      # MongoDB layer (PyMongo async client)
 │   ├── engine.py        # Python chess engine (used server-side)
 │   ├── logger.py
 │   └── webapp/
@@ -74,7 +88,7 @@ Chesa_Auto/
 │       └── autoplay.js  # autoplay controller
 ├── Procfile             # Heroku web process
 ├── app.json             # Heroku one-click deploy config
-├── runtime.txt
+├── .python-version   # Python 3.12 for Heroku
 ├── requirements.txt
 └── config.env.example
 ```

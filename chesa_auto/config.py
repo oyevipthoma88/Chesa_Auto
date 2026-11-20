@@ -4,19 +4,27 @@ from dotenv import load_dotenv
 load_dotenv("config.env")
 
 
+def _int(name: str, default: int = 0) -> int:
+    raw = (os.environ.get(name) or "").strip()
+    try:
+        return int(raw) if raw else default
+    except ValueError:
+        return default
+
+
 class Config:
     """Central configuration loaded from environment variables."""
 
-    API_ID = int(os.environ.get("API_ID", "0") or 0)
+    API_ID = _int("API_ID", 0)
     API_HASH = os.environ.get("API_HASH", "")
     BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
-    OWNER_ID = int(os.environ.get("OWNER_ID", "0") or 0)
+    OWNER_ID = _int("OWNER_ID", 0)
     OWNER_USERNAME = os.environ.get("OWNER_USERNAME", "")
 
     MONGO_URI = os.environ.get("MONGO_URI", "")
     MONGO_DB = os.environ.get("MONGO_DB", "chesa_auto")
 
-    LOG_CHANNEL = int(os.environ.get("LOG_CHANNEL", "0") or 0)
+    LOG_CHANNEL = _int("LOG_CHANNEL", 0)
     LOG_GC = LOG_CHANNEL
 
     UPDATE_CHANNEL = os.environ.get("UPDATE_CHANNEL", "")
@@ -25,11 +33,14 @@ class Config:
     GAME_BOT_USERNAME = os.environ.get("GAME_BOT_USERNAME", "GameFactoryBot")
     GAME_NAME = os.environ.get("GAME_NAME", "Chesa")
 
-    WEBAPP_PORT = int(os.environ.get("PORT", "8080") or 8080)
-    AUTOPLAY_DEPTH = int(os.environ.get("AUTOPLAY_DEPTH", "3") or 3)
+    WEBAPP_PORT = _int("PORT", 8080)
+    AUTOPLAY_DEPTH = _int("AUTOPLAY_DEPTH", 3)
     AUTOPLAY_ENABLED = os.environ.get("AUTOPLAY_ENABLED", "true").lower() == "true"
 
     HEROKU_APP_NAME = os.environ.get("HEROKU_APP_NAME", "")
+    # Full public https URL of the webapp, e.g. https://chesa-auto-1a2b3c4d.herokuapp.com/webapp/
+    # New Heroku apps get a random suffix in their domain, so set this explicitly.
+    WEBAPP_URL = os.environ.get("WEBAPP_URL", "").strip()
 
     @classmethod
     def validate(cls) -> list:
@@ -45,8 +56,6 @@ class Config:
             missing.append("OWNER_ID")
         if not cls.MONGO_URI:
             missing.append("MONGO_URI")
-        if not cls.LOG_CHANNEL:
-            missing.append("LOG_CHANNEL")
         return missing
 
 
