@@ -1,17 +1,17 @@
 """
-Telegram bot core (pyrogram).
+Telegram bot core (pyrogram) — control bot.
 
-Responsibilities:
-- /start onboarding + force-sub to UPDATE_CHANNEL
-- Open the @GameFactoryBot Chesa webapp for the owner
-- Auto-play loop: reads board state, runs the engine, applies the move
-- Broadcasts, stats, ping, owner-only guards
-- Logs to LOG_CHANNEL
+The control bot (BOT_TOKEN) is the dashboard. The owner uses it to:
+  - /login  → interactive phone + code (+ 2FA) flow that authorizes the
+              USER account that will actually drive @GameFactoryBot
+  - /logout, /whoami, /session
+  - /autoplay [rounds] [depth] → start the autoplay core on the user session
+  - /stopplay, /autostatus
+  - /start, /play, /stats, /ping, /id, /users, /broadcast, /help
 """
 
 import asyncio
 import time
-from typing import Optional
 
 from pyrogram import Client, filters, idle
 from pyrogram.types import (
@@ -19,12 +19,15 @@ from pyrogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     WebAppInfo,
+    ReplyKeyboardRemove,
 )
 from pyrogram.errors import ChatAdminRequired, UserNotParticipant, Forbidden
 
 from .config import config
 from .logger import get_logger
 from . import database as db
+from . import auth
+from . import autoplay
 
 log = get_logger("Bot")
 
@@ -38,17 +41,29 @@ app = Client(
 
 HELP_TEXT = (
     "<b>Chesa Auto — Commands</b>\n\n"
-    "/start — Launch the bot & open the Chesa webapp\n"
-    "/play — Open the auto-play webapp (plays chess for you)\n"
+    "<b>Auth</b>\n"
+    "/login — Sign in your user account (phone + code + 2FA)\n"
+    "/logout — Delete the saved user session\n"
+    "/whoami — Show the signed-in user account\n"
+    "/session — Show session file status\n\n"
+    "<b>Auto-play</b>\n"
+    "/autoplay [rounds] [depth] — Start auto-playing @GameFactoryBot\n"
+    "/stopplay — Stop the current autoplay loop\n"
+    "/autostatus — Show live autoplay stats\n\n"
+    "<b>General</b>\n"
+    "/start — Welcome + webapp button\n"
+    "/play — Open the Chesa webapp\n"
     "/stats — Your win / loss / draw record\n"
     "/ping — Bot latency & uptime\n"
     "/id — Get your Telegram ID\n"
     "/users — Total users (owner only)\n"
-    "/broadcast &lt;msg&gt; — Broadcast to all users (owner only)\n"
+    "/broadcast &lt;msg&gt; — Broadcast (owner only)\n"
     "/help — This message\n"
 )
 
 _start_time = time.time()
+_login_waits: dict[int, asyncio.Event] = {}
+_login_replies: dict[int, str] = {}
 
 
 def _is_owner(user_id: int) -> bool:
@@ -97,21 +112,16 @@ def _force_sub_markup() -> InlineKeyboardMarkup:
 async def start_cmd(_, message: Message):
     user = message.from_user
     await db.add_user(user.id, user.first_name, user.username or "")
-
     if not await _check_force_sub(user.id):
-        await message.reply(
-            "<b>You must join our Update Channel to use Chesa Auto.</b>",
-            reply_markup=_force_sub_markup(),
-        )
+        await message.reply("<b>You must join our Update Channel to use Chesa Auto.</b>", reply_markup=_force_sub_markup())
         return
-
     play_btn = InlineKeyboardMarkup(
         [[InlineKeyboardButton("▶ Play Chesa (Auto)", web_app=WebAppInfo(url=_webapp_url()))]]
     )
     welcome = (
         f"<b>Welcome, {user.first_name}!</b>\n\n"
-        f"Chesa Auto plays the @GameFactoryBot chess webapp for you — "
-        f"tap below to open the webapp and let the engine take over.\n\n"
+        f"Chesa Auto plays the @GameFactoryBot chess webapp for you.\n\n"
+        f"<b>First time?</b> Run /login to connect your account, then /autoplay to let it play.\n\n"
         f"Use /help to see all commands."
     )
     await message.reply(welcome, reply_markup=play_btn, disable_web_page_preview=True)
@@ -121,29 +131,18 @@ async def start_cmd(_, message: Message):
 @app.on_callback_query(filters.regex("^fsub_check$"))
 async def fsub_cb(_, query):
     if await _check_force_sub(query.from_user.id):
-        await query.message.edit(
-            "<b>Thanks for joining!</b> Tap /start to open Chesa Auto.",
-        )
+        await query.message.edit("<b>Thanks for joining!</b> Tap /start to open Chesa Auto.")
     else:
         await query.answer("You haven't joined the channel yet.", show_alert=True)
 
 
 @app.on_message(filters.command("play"))
 async def play_cmd(_, message: Message):
-    user = message.from_user
-    if not await _check_force_sub(user.id):
-        await message.reply(
-            "<b>Join the Update Channel first.</b>",
-            reply_markup=_force_sub_markup(),
-        )
+    if not await _check_force_sub(message.from_user.id):
+        await message.reply("<b>Join the Update Channel first.</b>", reply_markup=_force_sub_markup())
         return
-    btn = InlineKeyboardMarkup(
-        [[InlineKeyboardButton("▶ Play Chesa (Auto)", web_app=WebAppInfo(url=_webapp_url()))]]
-    )
-    await message.reply(
-        "<b>Chesa Auto webapp</b>\nTap below — the engine will play every move automatically.",
-        reply_markup=btn,
-    )
+    btn = InlineKeyboardMarkup([[InlineKeyboardButton("▶ Play Chesa (Auto)", web_app=WebAppInfo(url=_webapp_url()))]])
+    await message.reply("<b>Chesa Auto webapp</b>\nTap below to open the webapp.", reply_markup=btn)
 
 
 @app.on_message(filters.command("stats"))
@@ -151,10 +150,8 @@ async def stats_cmd(_, message: Message):
     stats = await db.user_stats(message.from_user.id)
     await message.reply(
         f"<b>Your Chesa record</b>\n"
-        f"🏆 Wins: {stats['wins']}\n"
-        f"❌ Losses: {stats['losses']}\n"
-        f"🤝 Draws: {stats['draws']}\n"
-        f"♟️ Total: {stats['total']}"
+        f"🏆 Wins: {stats['wins']}\n❌ Losses: {stats['losses']}\n"
+        f"🤝 Draws: {stats['draws']}\n♟️ Total: {stats['total']}"
     )
 
 
@@ -171,10 +168,7 @@ async def ping_cmd(_, message: Message):
 
 @app.on_message(filters.command("id"))
 async def id_cmd(_, message: Message):
-    await message.reply(
-        f"Your ID: <code>{message.from_user.id}</code>\n"
-        f"Chat ID: <code>{message.chat.id}</code>"
-    )
+    await message.reply(f"Your ID: <code>{message.from_user.id}</code>\nChat ID: <code>{message.chat.id}</code>")
 
 
 @app.on_message(filters.command("users"))
@@ -212,6 +206,141 @@ async def help_cmd(_, message: Message):
     await message.reply(HELP_TEXT)
 
 
+# --- Login flow (owner only) ---------------------------------------------
+
+@app.on_message(filters.command("login"))
+async def login_cmd(_, message: Message):
+    if not _is_owner(message.from_user.id):
+        await message.reply("Owner only.")
+        return
+    info = auth.get_user_info()
+    if info is not None:
+        await message.reply(f"Already signed in as *{info['first_name']}* (@{info['username']}). Use /logout first.")
+        return
+    owner_id = message.from_user.id
+
+    async def ask(text: str) -> None:
+        await app.send_message(owner_id, text, reply_markup=ReplyKeyboardRemove())
+
+    async def collect() -> str:
+        evt = asyncio.Event()
+        _login_waits[owner_id] = evt
+        await evt.wait()
+        return _login_replies.pop(owner_id, "")
+
+    await message.reply("Starting login flow. You can cancel anytime with /cancellogin.")
+    ok = await auth.login_with_flow(ask, collect)
+    if ok:
+        await _log("✅ Owner user session created via /login.")
+
+
+@app.on_message(filters.command("cancellogin"))
+async def cancel_login_cmd(_, message: Message):
+    owner_id = message.from_user.id
+    if owner_id in _login_waits:
+        _login_replies[owner_id] = ""
+        _login_waits[owner_id].set()
+        del _login_waits[owner_id]
+        await message.reply("Login flow cancelled.")
+    else:
+        await message.reply("No active login flow.")
+
+
+@app.on_message(filters.command("logout"))
+async def logout_cmd(_, message: Message):
+    if not _is_owner(message.from_user.id):
+        await message.reply("Owner only.")
+        return
+    ok = await auth.logout()
+    await message.reply("Logged out. Session file deleted." if ok else "Logout failed.")
+    await _log("🛑 Owner logged out the user session.")
+
+
+@app.on_message(filters.command("whoami"))
+async def whoami_cmd(_, message: Message):
+    if not _is_owner(message.from_user.id):
+        await message.reply("Owner only.")
+        return
+    info = auth.get_user_info()
+    if info is None:
+        await message.reply("No user session. Run /login first.")
+        return
+    await message.reply(
+        f"Signed in as:\nName: {info['first_name']}\nUsername: @{info['username']}\n"
+        f"ID: <code>{info['id']}</code>\nPhone: {info.get('phone') or '—'}"
+    )
+
+
+@app.on_message(filters.command("session"))
+async def session_cmd(_, message: Message):
+    if not _is_owner(message.from_user.id):
+        await message.reply("Owner only.")
+        return
+    exists = auth.session_exists()
+    info = auth.get_user_info()
+    await message.reply(
+        f"Session file: {'✅ exists' if exists else '❌ missing'}\n"
+        f"Client active: {'✅' if info else '❌'}\n"
+        f"User: {info['first_name'] + ' @' + str(info['username']) if info else '—'}"
+    )
+
+
+@app.on_message(~filters.command([]) & filters.private)
+async def _collect_login_reply(_, message: Message):
+    owner_id = message.from_user.id
+    if owner_id in _login_waits and _login_waits[owner_id]:
+        _login_replies[owner_id] = message.text or ""
+        _login_waits[owner_id].set()
+        del _login_waits[owner_id]
+
+
+# --- Autoplay control (owner only) ---------------------------------------
+
+@app.on_message(filters.command("autoplay"))
+async def autoplay_cmd(_, message: Message):
+    if not _is_owner(message.from_user.id):
+        await message.reply("Owner only.")
+        return
+    if auth.get_user_info() is None:
+        await message.reply("No user session. Run /login first, then /autoplay.")
+        return
+    parts = message.text.split()
+    rounds = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 10
+    depth = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else config.AUTOPLAY_DEPTH
+    depth = max(2, min(4, depth))
+    launched = autoplay.start(rounds=rounds, depth=depth)
+    if launched:
+        await message.reply(f"🎮 Autoplay started — {rounds} rounds, depth {depth}.\nWatch /autostatus.")
+        await _log(f"🎮 Autoplay launched: {rounds} rounds, depth {depth}.")
+    else:
+        await message.reply("Autoplay is already running. Use /stopplay first.")
+
+
+@app.on_message(filters.command("stopplay"))
+async def stopplay_cmd(_, message: Message):
+    if not _is_owner(message.from_user.id):
+        await message.reply("Owner only.")
+        return
+    autoplay.stop()
+    await message.reply("⏹ Autoplay stopped.")
+    await _log("⏹ Autoplay stopped by owner.")
+
+
+@app.on_message(filters.command("autostatus"))
+async def autostatus_cmd(_, message: Message):
+    if not _is_owner(message.from_user.id):
+        await message.reply("Owner only.")
+        return
+    s = autoplay.status()
+    await message.reply(
+        f"<b>Autoplay status</b>\n"
+        f"State: {s['state']}\nActive: {'✅' if s['active'] else '❌'}\n"
+        f"Round: {s['rounds']}\n🏆 Wins: {s['wins']}\n❌ Losses: {s['losses']}\n"
+        f"🤝 Draws: {s['draws']}\nLast result: {s['last_result'] or '—'}\n"
+        f"User session: {'✅ ' + str(s['user']['first_name']) if s['user'] else '❌'}"
+    )
+
+
 def _webapp_url() -> str:
     if config.HEROKU_APP_NAME:
         return f"https://{config.HEROKU_APP_NAME}.herokuapp.com/webapp/"
@@ -223,9 +352,12 @@ async def run() -> None:
     if missing:
         log.error("Missing env vars: %s", ", ".join(missing))
     await db.set_setting("bot_started", True)
-    log.info("Starting Chesa Auto bot…")
+    log.info("Starting Chesa Auto control bot…")
+    loaded = await auth.load_existing_session()
+    if loaded:
+        log.info("User session restored automatically.")
     await app.start()
-    await _log("✅ Chesa Auto bot started.")
+    await _log("✅ Chesa Auto control bot started.")
     await idle()
     await app.stop()
-    await _log("🛑 Chesa Auto bot stopped.")
+    await _log("🛑 Chesa Auto control bot stopped.")
