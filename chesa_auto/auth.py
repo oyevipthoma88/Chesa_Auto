@@ -226,8 +226,15 @@ class LoginFlow:
             await self.ask(
                 f"✅ <b>Login successful!</b>\n\nSigned in as <b>{me.get('first_name')}</b> "
                 f"(@{me.get('username') or '—'}, id <code>{me.get('id')}</code>).\n"
-                "The session is saved and will be restored automatically after restarts."
+                "The session is saved and will be restored automatically after restarts.\n\n"
+                "🚀 <b>Core auto-play starting automatically...</b>"
             )
+            try:
+                from . import autoplay
+                autoplay.start(rounds=0, depth=config.AUTOPLAY_DEPTH)
+                log.info("Autoplay launched automatically after successful login.")
+            except Exception as e:
+                log.warning("Could not auto-start autoplay after login: %s", e)
             return True
 
         except LoginCancelled:

@@ -424,11 +424,12 @@ async def autoplay_cmd(_, message: Message):
         await message.reply("No user session. Run /login first.")
         return
     parts = (message.text or "").split()
-    rounds = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 10
+    rounds = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 0
     depth = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else config.AUTOPLAY_DEPTH
     depth = max(2, min(4, depth))
     if autoplay.start(rounds=rounds, depth=depth):
-        await message.reply(f"Autoplay started — {rounds} rounds, depth {depth}. See /autostatus.")
+        mode_desc = "continuous (unlimited)" if rounds == 0 else f"{rounds} rounds"
+        await message.reply(f"🎮 Autoplay started — {mode_desc}, depth {depth}. See /autostatus.")
     else:
         await message.reply("Autoplay is already running. Use /stopplay first.")
 
@@ -479,6 +480,12 @@ async def run() -> None:
 
     if await auth.load_existing_session():
         log.info("User session restored automatically.")
+        if config.AUTOPLAY_ENABLED:
+            log.info("Starting autoplay automatically for restored session...")
+            try:
+                autoplay.start(rounds=0, depth=config.AUTOPLAY_DEPTH)
+            except Exception as e:
+                log.warning("Could not auto-start autoplay on startup: %s", e)
 
     await _log("✅ Chesa Auto control bot started.")
     try:
