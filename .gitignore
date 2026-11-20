@@ -1,0 +1,31 @@
+# ─── Python ───
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# ─── Env / secrets ───
+config.env
+.env
+*.session
+*.session-journal
+*.db
+*.sqlite3
+
+# ─── Node ───
+node_modules/
+dist/
+.vite/
+
+# ─── OS / editor ───
+.DS_Store
+.idea/
+.vscode/
+*.swp
