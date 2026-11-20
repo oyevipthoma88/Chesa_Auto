@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Chesa Auto</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Chesa Auto</h1>
+    <p id="status">Initializing engine…</p>
+  </header>
+
+  <div id="board" class="board"></div>
+
+  <div class="controls">
+    <button id="startBtn">▶ Start Auto-Play</button>
+    <button id="stopBtn" disabled>■ Stop</button>
+    <label class="depth">
+      Search depth
+      <select id="depthSel">
+        <option value="2">Fast (2)</option>
+        <option value="3" selected>Balanced (3)</option>
+        <option value="4">Strong (4)</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="log" id="moveLog"></div>
+</div>
+<script src="engine.js"></script>
+<script src="autoplay.js"></script>
+</body>
+</html>
