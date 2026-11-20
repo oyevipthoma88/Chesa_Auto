@@ -210,7 +210,11 @@ async def start_cmd(_, message: Message):
         "Chesa Auto control bot.\n\n"
         "Use /help to see all commands."
     )
-    await message.reply(welcome, reply_markup=_play_markup(), disable_web_page_preview=True)
+    markup = _play_markup()
+    if markup:
+        await message.reply(welcome, reply_markup=markup)
+    else:
+        await message.reply(welcome)
     await _log(f"#NewUser <code>{user.id}</code> @{_esc(user.username) or '—'} started the bot.")
 
 
