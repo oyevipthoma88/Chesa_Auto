@@ -1,24 +1,82 @@
 {
   "name": "Chesa Auto",
-  "description": "Telegram auto-play bot for the @GameFactoryBot Chesa (chess) webapp. Opens the webapp and plays every move automatically with an expert-level alpha-beta engine to maximize wins.",
+  "description": "Telegram Chesa chess webapp auto-play bot",
   "repository": "https://github.com/oyevipthoma88/Chesa_Auto",
-  "keywords": ["telegram", "bot", "chess", "auto-play", "pyrogram", "heroku"],
+  "keywords": [
+    "telegram",
+    "bot",
+    "chess",
+    "auto-play",
+    "pyrogram",
+    "heroku"
+  ],
   "env": {
-    "API_ID": {"description": "Telegram API ID from https://my.telegram.org/apps", "required": true},
-    "API_HASH": {"description": "Telegram API hash from https://my.telegram.org/apps", "required": true},
-    "BOT_TOKEN": {"description": "Bot token from @BotFather", "required": true},
-    "OWNER_ID": {"description": "Your Telegram user ID (numeric). Get it from @userinfobot.", "required": true},
-    "OWNER_USERNAME": {"description": "Your Telegram username (without @)", "required": false},
-    "MONGO_URI": {"description": "MongoDB connection string (MongoDB Atlas). e.g. mongodb+srv://user:pass@cluster.mongodb.net", "required": true},
-    "MONGO_DB": {"description": "MongoDB database name", "value": "chesa_auto", "required": false},
-    "LOG_CHANNEL": {"description": "Telegram chat ID (numeric) where logs are sent. Add the bot as admin there.", "required": true},
-    "UPDATE_CHANNEL": {"description": "Update channel username (with @) for force-sub. e.g. @YourChannel", "required": false},
-    "UPDATE_CHANNEL_LINK": {"description": "https://t.me/YourUpdateChannel link for the join button", "required": false},
-    "GAME_BOT_USERNAME": {"description": "The game bot to open (default GameFactoryBot)", "value": "GameFactoryBot", "required": false},
-    "HEROKU_APP_NAME": {"description": "Your Heroku app name (used to build the webapp URL). e.g. chesa-auto", "required": false},
-    "AUTOPLAY_DEPTH": {"description": "Engine search depth (2=fast, 3=balanced, 4=strongest)", "value": "3", "required": false}
+    "API_ID": {
+      "description": "Telegram API ID from my.telegram.org",
+      "required": true
+    },
+    "API_HASH": {
+      "description": "Telegram API Hash from my.telegram.org",
+      "required": true
+    },
+    "BOT_TOKEN": {
+      "description": "Bot token from @BotFather",
+      "required": true
+    },
+    "OWNER_ID": {
+      "description": "Numeric Telegram owner ID",
+      "required": true
+    },
+    "OWNER_USERNAME": {
+      "description": "Owner username without @",
+      "required": false
+    },
+    "MONGO_URI": {
+      "description": "MongoDB Atlas connection string",
+      "required": true
+    },
+    "MONGO_DB": {
+      "description": "MongoDB database name",
+      "value": "chesa_auto",
+      "required": false
+    },
+    "LOG_CHANNEL": {
+      "description": "Numeric Telegram log channel ID",
+      "required": true
+    },
+    "UPDATE_CHANNEL": {
+      "description": "Update channel username with @",
+      "required": false
+    },
+    "UPDATE_CHANNEL_LINK": {
+      "description": "Update channel invite URL",
+      "required": false
+    },
+    "GAME_BOT_USERNAME": {
+      "description": "Game bot username",
+      "value": "GameFactoryBot",
+      "required": false
+    },
+    "HEROKU_APP_NAME": {
+      "description": "Heroku app name",
+      "required": false
+    },
+    "AUTOPLAY_DEPTH": {
+      "description": "Engine depth: 2, 3 or 4",
+      "value": "3",
+      "required": false
+    }
   },
-  "formation": {"web": {"quantity": 1, "size": "eco"}},
-  "buildpacks": [{"url": "heroku/python"}],
-  "stack": "heroku-22"
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "eco"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "stack": "heroku-26"
 }
