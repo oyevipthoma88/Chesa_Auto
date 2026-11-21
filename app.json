@@ -67,7 +67,7 @@
       "required": false
     },
     "WEBAPP_URL": {
-      "description": "Full https URL of the webapp, e.g. https://your-app-xxxx.herokuapp.com/webapp/ (copy from Heroku \u2192 Settings \u2192 Domains)",
+      "description": "Full https URL of the webapp or GameFactory game link",
       "required": false
     }
   },
@@ -78,6 +78,9 @@
     }
   },
   "buildpacks": [
+    {
+      "url": "heroku-community/apt"
+    },
     {
       "url": "heroku/python"
     }
