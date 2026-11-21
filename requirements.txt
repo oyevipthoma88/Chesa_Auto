@@ -2,3 +2,4 @@ kurigram==2.2.27
 tgcrypto==1.2.5
 pymongo==4.20.1
 python-dotenv==1.2.4
+playwright==1.49.1
